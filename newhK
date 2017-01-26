@@ -1,0 +1,141 @@
+#!/bin/bash -e
+# newHK
+#* To start a new Haskell kata ready to BDD/TDD in few seconds using *stack*.
+#* The kata will be placed next to the other katas in its own directory.
+#  * Easy to configurate by editing the bash program in only one place.
+#
+## Usage:
+#    newHK  NameOfTheNewHaskellKata
+#
+## Details:
+#* https://www.stackbuilders.com/tutorials/haskell/bdd-in-haskell-with-hspec/
+#
+## Features:
+#* Automatically update uppercase/lowercase of the name of the kata wherever is needed.
+#* Check after smashing an existent directory.
+#* Without arguments, it shows some help.
+
+
+# Please, set up the next variable as the kata root:
+KATAROOT="$HOME/git/GITHUB"
+
+# From now on, don't touch unless you know what are you doing.
+
+KATA_U=`eval "echo ${1} | sed 's/^./\u&/'"`  # NameOfTheNewKata. First letter to uppercase
+KATA_L=`eval "echo ${1} | sed 's/^./\l&/'"`  # NameOfTheNewKata. First letter to lowercase
+
+function check()
+{
+if [ -z "$KATA_L" ]           ; then echo "usage:   $0 NameOfTheNewHaskellKata" ; echo   ; exit 1; fi
+if [ -d "$KATAROOT/$KATA_L" ] ; then echo "New Haskell Kata '$KATA_L' already exists."   ; exit 1; fi
+}
+
+function doit()
+{
+echo -e "\033[1m$KATA_U\033[0m kata is being prepared."
+echo -e "\033[1mBDD/TDD metodology\033[0m is your friend (\033[1mRed-Green\033[0m):"
+echo "    https://en.wikipedia.org/wiki/Behavior-driven_development"
+echo "    https://en.wikipedia.org/wiki/Test-driven_development"
+echo
+
+# Create, delete and update files:
+stack new "$KATA_L" hspec
+cd "$KATA_L"
+stack build --test
+
+rm -r src/Data/
+rm -r test/Data/
+rm -r app
+
+sed -i '/executable/,/^$/d' "$KATA_L".cabal
+
+sed -i "s/exposed-modules.*$/exposed-modules:     $KATA_U\n                     , $KATA_U.Internal/" "$KATA_L".cabal
+
+# Lastly we'll add some shell content for the project to compile:
+echo "module $KATA_U where" > "src/$KATA_U.hs"
+
+mkdir "src/$KATA_U"
+echo "module $KATA_U.Internal where" > "src/$KATA_U/Internal.hs"
+
+echo  "module ${KATA_U}Spec (main, spec) where" > test/"$KATA_U"Spec.hs
+echo                                           >> test/"$KATA_U"Spec.hs
+echo  "import Test.Hspec"                      >> test/"$KATA_U"Spec.hs
+echo  "import Test.QuickCheck"                 >> test/"$KATA_U"Spec.hs
+echo                                           >> test/"$KATA_U"Spec.hs
+echo  "import $KATA_U"                         >> test/"$KATA_U"Spec.hs
+echo  "import $KATA_U.Internal"                >> test/"$KATA_U"Spec.hs
+echo                                           >> test/"$KATA_U"Spec.hs
+echo  "main :: IO ()"                          >> test/"$KATA_U"Spec.hs
+echo  "main = hspec spec"                      >> test/"$KATA_U"Spec.hs
+echo                                           >> test/"$KATA_U"Spec.hs
+echo  "spec :: Spec"                           >> test/"$KATA_U"Spec.hs
+echo  "spec = do"                              >> test/"$KATA_U"Spec.hs
+echo  "  describe \"id\" $ do"                 >> test/"$KATA_U"Spec.hs
+echo  "    it \"identity function\" $ do"      >> test/"$KATA_U"Spec.hs
+echo  "      id 42 \`shouldBe\` 42"            >> test/"$KATA_U"Spec.hs
+
+echo >> "src/$KATA_U.hs"  # Important!!  (if not, stack build doesn't recognize last changes)
+stack build --test
+
+# git:
+cat > .gitignore << EOF
+*~
+*#
+.#*
+.cabal-sandbox
+cabal.sandbox.config
+.stack-work
+/**/dist/
+/**/TAGS
+EOF
+
+git init
+git add .gitignore *
+git status
+git commit -am "Create skeleton. Add $KATA_U, $KATA_U.Internal and ${KATA_U}Spec"
+
+echo
+echo "Current git log:"
+git log --graph --pretty=format:'%Cred%h% %Cgreen (%cd)%Creset%Creset %s %C(yellow)%d%Creset' --abbrev-commit --date=short
+
+# cdargs:
+sed -i "1i $KATA_L $KATAROOT/$KATA_L" ~/.cdargs
+
+# rg:
+# It would be helpful if you write a bash command, make executable, and reached by PATH variable.
+# The suggested name is "rg" (Red-Green), with this two lines (discard the first 6 characters):
+#    #!/bin/bash
+#    stack build --test
+
+# Some help:
+echo
+echo -e "\033[1mgit\033[0m is now particulary taking care of:"
+echo -e "    $KATAROOT/$KATA_L\033[1m/src/$KATA_U.hs\033[0m"
+echo -e "    $KATAROOT/$KATA_L\033[1m/src/$KATA_U/Internal.hs\033[0m"
+echo -e "    $KATAROOT/$KATA_L\033[1m/test/${KATA_U}Spec.hs\033[0m"
+echo
+echo -e "\033[4mShortcuts\033[0m:"
+echo -e "\033[1mcdb\033[0m   # (hit 'Enter' twice)   to go to the kata directory i.e.:"
+echo -e "    cd $KATAROOT/$KATA_U"
+echo -e "\033[1mrg\033[0m    # Compile, and if success, run tests    (\033[1mr\033[0med-\033[1mg\033[0mreen) i.e.:"
+echo -e "    stack build --test"
+
+# README.md    (Github)
+# this file is placed into the .stack-work hidden directory.
+# It would be helpful when you upload the repository to GitHub.
+echo "# $KATA_U"                                           > "$KATAROOT/$KATA_L/.stack-work/README.md"
+echo "Kata: $KATA_L (BDD/TDD Style) - "\"KATANAME"\""     >> "$KATAROOT/$KATA_L/.stack-work/README.md"
+echo                                                      >> "$KATAROOT/$KATA_L/.stack-work/README.md"
+echo "    git clone https://github.com/YOUR_USER/$KATA_L" >> "$KATAROOT/$KATA_L/.stack-work/README.md"
+echo "    cd $KATA_L"                                     >> "$KATAROOT/$KATA_L/.stack-work/README.md"
+echo '    stack build --test'                             >> "$KATAROOT/$KATA_L/.stack-work/README.md"
+
+# go start!
+cd "$KATAROOT/$KATA_L"
+emacs "src/$KATA_U.hs" "src/$KATA_U/Internal.hs" "test/${KATA_U}Spec.hs" &
+}
+
+check
+cd $KATAROOT
+doit
+
